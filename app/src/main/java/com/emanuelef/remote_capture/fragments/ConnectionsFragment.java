@@ -180,6 +180,8 @@ public class ConnectionsFragment extends Fragment implements ConnectionsListener
             int pos = mRecyclerView.getChildLayoutPosition(v);
             ConnectionDescriptor item = mAdapter.getItem(pos);
 
+            //kodex here is the click listener for recyclerview
+
             if(item != null) {
                 Intent intent = new Intent(requireContext(), ConnectionDetailsActivity.class);
                 AppDescriptor app = mApps.get(item.uid);

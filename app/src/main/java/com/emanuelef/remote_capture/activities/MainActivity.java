@@ -61,11 +61,14 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
 
+import com.emanuelef.remote_capture.TinyDB.TinyDB;
 import com.emanuelef.remote_capture.fragments.ConnectionsFragment;
 import com.emanuelef.remote_capture.fragments.StatusFragment;
 import com.emanuelef.remote_capture.interfaces.AppStateListener;
 import com.emanuelef.remote_capture.model.AppState;
 import com.emanuelef.remote_capture.CaptureService;
+import com.emanuelef.remote_capture.model.DomainModel;
+import com.emanuelef.remote_capture.model.JsonModelClass;
 import com.emanuelef.remote_capture.model.Prefs;
 import com.emanuelef.remote_capture.R;
 import com.emanuelef.remote_capture.Utils;
@@ -73,7 +76,12 @@ import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.FileNotFoundException;
+import java.util.ArrayList;
 import java.util.List;
 
 import cat.ereza.customactivityoncrash.config.CaocConfig;
@@ -103,6 +111,13 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     public static final String GITHUB_DOCS_URL = "https://emanuele-f.github.io/PCAPdroid";
     public static final String DONATE_URL = "https://emanuele-f.github.io/PCAPdroid/donate";
 
+
+    //Kodex static variable
+    public static String kodexJsonData;
+    public static ArrayList<DomainModel> kodexJsonArray = new ArrayList<>();
+    public static final String KODEX_PREFS_NAME = "kodex";
+
+
     private final ActivityResultLauncher<Intent> captureServiceLauncher =
             registerForActivityResult(new StartActivityForResult(), this::captureServiceResult);
     private final ActivityResultLauncher<Intent> pcapFileLauncher =
@@ -111,6 +126,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
             registerForActivityResult(new RequestPermission(), isGranted ->
                 Log.d(TAG, "Write permission " + (isGranted ? "granted" : "denied"))
             );
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -123,6 +139,46 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
         mPcapUri = CaptureService.getPcapUri();
+
+//         kodex Check if domain are already selcted or not
+        TinyDB tinydb = new TinyDB(this);
+//        SharedPreferences kodexPrefs = getSharedPreferences(KODEX_PREFS_NAME, MODE_PRIVATE);
+        String kodexDomains = tinydb.getString("kodexDomain");
+        if (kodexDomains.isEmpty()){
+            Log.d("Kodex Network: ","Domains are not saved in Local Preferances");
+        }else{
+            Log.d("Kodex Network: ","Domains Found"+kodexDomains);
+            try {
+                Log.d("Kodex Network: ","Domains being converted");
+                JSONObject jsonObject = new JSONObject(kodexDomains.trim());
+                JSONArray jsonArray = jsonObject.getJSONArray("domains");
+                ArrayList<DomainModel> listdata = new ArrayList<DomainModel>();
+                if (jsonArray != null) {
+
+                    for (int i=0;i<jsonArray.length();i++){
+                        JSONObject jObj = jsonArray.getJSONObject(i);
+                        Log.d("Kodex Network: ", String.valueOf(jsonArray.get(i)));
+                        DomainModel dataModel = new DomainModel();
+                        dataModel.setName(jObj.getString("name"));
+                        dataModel.setTitle(jObj.getString("title"));
+                        dataModel.setDescription(jObj.getString("description"));
+                        dataModel.setLink(jObj.getString("link"));
+                        dataModel.setImg(jObj.getString("img"));
+                        listdata.add((dataModel));
+                    }
+                }
+                for (DomainModel item : listdata){
+                    Log.d("Kodex Network: ",item.getName());
+                }
+
+                MainActivity.kodexJsonArray = listdata;
+
+            } catch (JSONException e) {
+                e.printStackTrace();
+                Log.d("Kodex Network: ","Domains exception found"+e.toString());
+            }
+        }
+        //kodex code ended
 
         CaocConfig.Builder.create()
                 .errorDrawable(R.drawable.ic_app_crash)

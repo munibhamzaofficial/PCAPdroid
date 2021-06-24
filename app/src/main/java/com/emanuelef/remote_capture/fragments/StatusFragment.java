@@ -20,6 +20,7 @@
 package com.emanuelef.remote_capture.fragments;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.app.Dialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -40,7 +41,12 @@ import android.view.ViewTreeObserver;
 import android.widget.AdapterView;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import androidx.activity.result.ActivityResult;
+import androidx.activity.result.ActivityResultCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -52,6 +58,7 @@ import androidx.preference.PreferenceManager;
 
 import com.emanuelef.remote_capture.AppsLoader;
 import com.emanuelef.remote_capture.AppsResolver;
+import com.emanuelef.remote_capture.activities.TextInputActivity;
 import com.emanuelef.remote_capture.adapters.DumpModesAdapter;
 import com.emanuelef.remote_capture.interfaces.AppsLoadListener;
 import com.emanuelef.remote_capture.model.AppDescriptor;
@@ -65,6 +72,9 @@ import com.emanuelef.remote_capture.interfaces.AppStateListener;
 import com.emanuelef.remote_capture.model.Prefs;
 import com.emanuelef.remote_capture.model.VPNStats;
 import com.emanuelef.remote_capture.views.AppsListView;
+import com.jaiselrahman.filepicker.activity.FilePickerActivity;
+import com.jaiselrahman.filepicker.config.Configurations;
+import com.jaiselrahman.filepicker.model.MediaFile;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -85,6 +95,9 @@ public class StatusFragment extends Fragment implements AppStateListener, AppsLo
     private String mAppFilter;
     private TextView mEmptyAppsView;
     AppsListView mOpenAppsList;
+
+    //Kodex
+    private TextView tvLoadFile,tvViewFile;
 
     @Override
     public void onAttach(@NonNull Context context) {
@@ -145,6 +158,28 @@ public class StatusFragment extends Fragment implements AppStateListener, AppsLo
         mQuickSettings = view.findViewById(R.id.quick_settings);
         mPrefs = PreferenceManager.getDefaultSharedPreferences(mActivity);
         mAppFilter = Prefs.getAppFilter(mPrefs);
+
+        //Kodex
+        tvLoadFile = view.findViewById(R.id.tvLoadFile);
+        tvViewFile = view.findViewById(R.id.tvViewFile);
+
+        tvLoadFile.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+//                openFilePicker();
+                Intent intent = new Intent(mActivity, TextInputActivity.class);
+                startActivity(intent);
+
+            }
+        });
+        tvViewFile.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(mActivity, TextInputActivity.class);
+                intent.putExtra("isForView",true);
+                startActivity(intent);
+            }
+        });
 
         DumpModesAdapter dumpModeAdapter = new DumpModesAdapter(requireContext());
         Spinner dumpMode = view.findViewById(R.id.dump_mode_spinner);
@@ -402,4 +437,5 @@ private void refreshPcapDumpInfo() {
         // Icons automatically loaded, no need to call loadInstalledApps again
         Log.d(TAG, "apps icons loaded");
     }
+
 }

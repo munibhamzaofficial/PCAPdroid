@@ -20,18 +20,24 @@
 package com.emanuelef.remote_capture.adapters;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.widget.LinearLayoutCompat;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.bumptech.glide.Glide;
+import com.emanuelef.remote_capture.activities.MainActivity;
 import com.emanuelef.remote_capture.interfaces.ConnectionsListener;
 import com.emanuelef.remote_capture.model.AppDescriptor;
 import com.emanuelef.remote_capture.CaptureService;
@@ -40,11 +46,15 @@ import com.emanuelef.remote_capture.model.ConnectionDescriptor;
 import com.emanuelef.remote_capture.ConnectionsRegister;
 import com.emanuelef.remote_capture.R;
 import com.emanuelef.remote_capture.Utils;
+import com.emanuelef.remote_capture.model.DomainModel;
+import com.emanuelef.remote_capture.model.JsonModelClass;
 import com.emanuelef.remote_capture.model.Whitelist;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Stream;
 
 public class ConnectionsAdapter extends RecyclerView.Adapter<ConnectionsAdapter.ViewHolder>
         implements ConnectionsListener {
@@ -71,6 +81,7 @@ public class ConnectionsAdapter extends RecyclerView.Adapter<ConnectionsAdapter.
         TextView traffic;
         TextView appName;
         TextView lastSeen;
+        LinearLayoutCompat llConnectionParent;
         final String mProtoAndPort;
 
         ViewHolder(View itemView) {
@@ -83,6 +94,8 @@ public class ConnectionsAdapter extends RecyclerView.Adapter<ConnectionsAdapter.
             statusInd = itemView.findViewById(R.id.status_ind);
             appName = itemView.findViewById(R.id.app_name);
             lastSeen = itemView.findViewById(R.id.last_seen);
+            //kodex
+            llConnectionParent = itemView.findViewById(R.id.llConnectionParent);
 
             Context context = itemView.getContext();
             mProtoAndPort = context.getString(R.string.proto_and_port);
@@ -96,34 +109,74 @@ public class ConnectionsAdapter extends RecyclerView.Adapter<ConnectionsAdapter.
             appIcon = ((app != null) && (app.getIcon() != null)) ? Objects.requireNonNull(app.getIcon().getConstantState()).newDrawable() : unknownIcon;
             icon.setImageDrawable(appIcon);
 
-            if(conn.info.length() > 0)
+            String info_txt = (app != null) ? app.getName() : Integer.toString(conn.uid);
+
+            if (conn.info.length() > 0)
                 remote.setText(conn.info);
             else
                 remote.setText(conn.dst_ip);
-
-            if(conn.dst_port != 0)
+            if (conn.dst_port != 0)
                 l7Text = String.format(mProtoAndPort, conn.l7proto, conn.dst_port);
             else
                 l7Text = conn.l7proto;
 
-            if(conn.ipver == 6)
+            if (conn.ipver == 6)
                 l7Text = l7Text + ", IPv6";
 
             l7proto.setText(l7Text);
 
-            String info_txt = (app != null) ? app.getName() : Integer.toString(conn.uid);
+
             appName.setText(info_txt);
             traffic.setText(Utils.formatBytes(conn.sent_bytes + conn.rcvd_bytes));
             lastSeen.setText(Utils.formatEpochShort(context, conn.last_seen));
             statusInd.setText(conn.getStatusLabel(context));
 
-            if(conn.status < ConnectionDescriptor.CONN_STATUS_CLOSED)
+            if (conn.status < ConnectionDescriptor.CONN_STATUS_CLOSED)
                 statusInd.setTextColor(0xFF28BC36); // Open
-            else if((conn.status == ConnectionDescriptor.CONN_STATUS_CLOSED)
+            else if ((conn.status == ConnectionDescriptor.CONN_STATUS_CLOSED)
                     || (conn.status == ConnectionDescriptor.CONN_STATUS_RESET))
                 statusInd.setTextColor(0xFFAAAAAA);
             else
                 statusInd.setTextColor(0xFFF20015); // Error
+
+            //kodex
+            DomainModel dataModel = new DomainModel();
+            boolean isContain = false;
+            boolean isForAll = false;
+            String nameToBeMatched;
+            for (DomainModel item : MainActivity.kodexJsonArray) {
+                if (item.getName().startsWith("*")) {
+                    isForAll = true;
+                    nameToBeMatched = item.getName().substring(1);
+                } else {
+                    isForAll = false;
+                    nameToBeMatched = item.getName();
+                }
+                if (isForAll) {
+                    if (conn.info.contains(nameToBeMatched)) {
+                        isContain = true;
+                        dataModel = item;
+                        break;
+                    }
+                } else {
+                    if (conn.info.equals(nameToBeMatched)) {
+                        isContain = true;
+                        dataModel = item;
+                        break;
+                    }
+                }
+
+            }
+            if (isContain) {
+                Glide.with(context).load(dataModel.getImg()).centerCrop().placeholder(appIcon).into(icon);
+                appName.setText(dataModel.getName());
+                l7proto.setText(dataModel.getTitle());
+                remote.setText(dataModel.getDescription());
+
+                llConnectionParent.setBackgroundColor(context.getResources().getColor(R.color.red));
+            } else {
+                llConnectionParent.setBackgroundColor(context.getResources().getColor(R.color.white));
+            }
         }
     }
 
@@ -147,7 +200,7 @@ public class ConnectionsAdapter extends RecyclerView.Adapter<ConnectionsAdapter.
 
     @Override
     public int getItemCount() {
-        return((mFilteredConn != null) ? mFilteredConn.size() : mUnfilteredItemsCount);
+        return ((mFilteredConn != null) ? mFilteredConn.size() : mUnfilteredItemsCount);
     }
 
     @NonNull
@@ -158,7 +211,7 @@ public class ConnectionsAdapter extends RecyclerView.Adapter<ConnectionsAdapter.
         // Enable the ability to show the context menu
         view.setLongClickable(true);
 
-        if(mListener != null)
+        if (mListener != null)
             view.setOnClickListener(mListener);
 
         ViewHolder holder = new ViewHolder(view);
@@ -175,7 +228,7 @@ public class ConnectionsAdapter extends RecyclerView.Adapter<ConnectionsAdapter.
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         ConnectionDescriptor conn = getItem(position);
 
-        if(conn == null)
+        if (conn == null)
             return;
 
         holder.bindConn(mContext, conn, mApps, mUnknownIcon);
@@ -189,7 +242,7 @@ public class ConnectionsAdapter extends RecyclerView.Adapter<ConnectionsAdapter.
     }
 
     private boolean matches(ConnectionDescriptor conn) {
-        return((conn != null)
+        return ((conn != null)
                 && (!mWhitelistEnabled || !mWhitelist.matches(conn)))
                 && ((mFilter == null) || conn.matches(mApps, mFilter));
     }
@@ -197,10 +250,10 @@ public class ConnectionsAdapter extends RecyclerView.Adapter<ConnectionsAdapter.
     private int getFilteredItemPos(int incrId) {
         Integer pos = mIdToFilteredPos.get(incrId);
 
-        if(pos == null)
+        if (pos == null)
             return -1;
 
-        return(pos - mNumRemovedItems);
+        return (pos - mNumRemovedItems);
     }
 
     @Override
@@ -210,10 +263,10 @@ public class ConnectionsAdapter extends RecyclerView.Adapter<ConnectionsAdapter.
     }
 
     @Override
-    public void connectionsAdded(int start, ConnectionDescriptor []conns) {
+    public void connectionsAdded(int start, ConnectionDescriptor[] conns) {
         mUnfilteredItemsCount += conns.length;
 
-        if(mFilteredConn == null) {
+        if (mFilteredConn == null) {
             notifyItemRangeInserted(start, conns.length);
             return;
         }
@@ -222,34 +275,34 @@ public class ConnectionsAdapter extends RecyclerView.Adapter<ConnectionsAdapter.
         int vpos = mNumRemovedItems + mFilteredConn.size();
 
         // Assume that connections are only added at the end of the dataset
-        for(ConnectionDescriptor conn : conns) {
-            if(matches(conn)) {
+        for (ConnectionDescriptor conn : conns) {
+            if (matches(conn)) {
                 mIdToFilteredPos.put(conn.incr_id, vpos++);
                 mFilteredConn.add(conn);
                 numNew++;
             }
         }
 
-        if(numNew > 0)
+        if (numNew > 0)
             notifyItemRangeInserted(mFilteredConn.size() - numNew, numNew);
     }
 
     @Override
-    public void connectionsRemoved(int start, ConnectionDescriptor []conns) {
+    public void connectionsRemoved(int start, ConnectionDescriptor[] conns) {
         mUnfilteredItemsCount -= conns.length;
 
-        if(mFilteredConn == null) {
+        if (mFilteredConn == null) {
             notifyItemRangeRemoved(start, conns.length);
             return;
         }
 
-        for(ConnectionDescriptor conn: conns) {
-            if(conn == null)
+        for (ConnectionDescriptor conn : conns) {
+            if (conn == null)
                 continue;
 
             int vpos = getFilteredItemPos(conn.incr_id);
 
-            if(vpos != -1) {
+            if (vpos != -1) {
                 // Assume that connections are only remove from the start of the dataset
                 mFilteredConn.remove(0);
                 mIdToFilteredPos.remove(conn.incr_id);
@@ -262,21 +315,21 @@ public class ConnectionsAdapter extends RecyclerView.Adapter<ConnectionsAdapter.
 
     @Override
     public void connectionsUpdated(int[] positions) {
-        if(mFilteredConn == null) {
-            for(int pos : positions)
+        if (mFilteredConn == null) {
+            for (int pos : positions)
                 notifyItemChanged(pos);
             return;
         }
 
         ConnectionsRegister reg = CaptureService.requireConnsRegister();
 
-        for(int pos : positions) {
+        for (int pos : positions) {
             ConnectionDescriptor conn = reg.getConn(pos);
 
-            if(conn != null) {
+            if (conn != null) {
                 int vpos = getFilteredItemPos(conn.incr_id);
 
-                if(vpos != -1) {
+                if (vpos != -1) {
                     Log.d(TAG, "Changed item " + vpos + ", dataset size: " + getItemCount());
                     notifyItemChanged(pos);
                 }
@@ -287,21 +340,21 @@ public class ConnectionsAdapter extends RecyclerView.Adapter<ConnectionsAdapter.
     public void refreshFilteredConnections() {
         final ConnectionsRegister reg = CaptureService.getConnsRegister();
 
-        if(reg == null)
+        if (reg == null)
             return;
 
         Log.d(TAG, "refreshFilteredConn (" + mUnfilteredItemsCount + ") unfiltered");
         mIdToFilteredPos.clear();
         mNumRemovedItems = 0;
 
-        if(hasWhitelistFilter() || (mFilter != null)) {
+        if (hasWhitelistFilter() || (mFilter != null)) {
             int vpos = 0;
             mFilteredConn = new ArrayList<>();
 
-            for(int i=0; i<mUnfilteredItemsCount; i++) {
+            for (int i = 0; i < mUnfilteredItemsCount; i++) {
                 ConnectionDescriptor conn = reg.getConn(i);
 
-                if(matches(conn)) {
+                if (matches(conn)) {
                     mFilteredConn.add(conn);
                     mIdToFilteredPos.put(conn.incr_id, vpos++);
                 }
@@ -315,16 +368,19 @@ public class ConnectionsAdapter extends RecyclerView.Adapter<ConnectionsAdapter.
     }
 
     public ConnectionDescriptor getItem(int pos) {
-        if(mFilteredConn != null)
+        if (mFilteredConn != null)
             return mFilteredConn.get(pos);
 
         ConnectionsRegister reg = CaptureService.getConnsRegister();
 
-        if((pos < 0) || (pos >= mUnfilteredItemsCount) || (reg == null))
+        if ((pos < 0) || (pos >= mUnfilteredItemsCount) || (reg == null))
             return null;
 
         return reg.getConn(pos);
     }
+
+    //kodex
+
 
     public void setFilter(String text) {
         mFilter = text;
@@ -352,31 +408,48 @@ public class ConnectionsAdapter extends RecyclerView.Adapter<ConnectionsAdapter.
         builder.append("\n");
 
         // Contents
-        for(int i=0; i<getItemCount(); i++) {
+        for (int i = 0; i < getItemCount(); i++) {
             ConnectionDescriptor conn = getItem(i);
 
-            if(conn != null) {
+            if (conn != null) {
                 AppDescriptor app = resolver.get(conn.uid);
 
-                builder.append(conn.ipproto);                               builder.append(",");
-                builder.append(conn.src_ip);                                builder.append(",");
-                builder.append(conn.src_port);                              builder.append(",");
-                builder.append(conn.dst_ip);                                builder.append(",");
-                builder.append(conn.dst_port);                              builder.append(",");
-                builder.append(conn.uid);                                   builder.append(",");
-                builder.append((app != null) ? app.getName() : "");         builder.append(",");
-                builder.append(conn.l7proto);                               builder.append(",");
-                builder.append(conn.getStatusLabel(mContext));              builder.append(",");
-                builder.append((conn.info != null) ? conn.info : "");       builder.append(",");
-                builder.append(conn.sent_bytes);                            builder.append(",");
-                builder.append(conn.rcvd_bytes);                            builder.append(",");
-                builder.append(conn.sent_pkts);                             builder.append(",");
-                builder.append(conn.rcvd_pkts);                             builder.append(",");
-                builder.append(conn.first_seen);                            builder.append(",");
-                builder.append(conn.last_seen);                             builder.append("\n");
+                builder.append(conn.ipproto);
+                builder.append(",");
+                builder.append(conn.src_ip);
+                builder.append(",");
+                builder.append(conn.src_port);
+                builder.append(",");
+                builder.append(conn.dst_ip);
+                builder.append(",");
+                builder.append(conn.dst_port);
+                builder.append(",");
+                builder.append(conn.uid);
+                builder.append(",");
+                builder.append((app != null) ? app.getName() : "");
+                builder.append(",");
+                builder.append(conn.l7proto);
+                builder.append(",");
+                builder.append(conn.getStatusLabel(mContext));
+                builder.append(",");
+                builder.append((conn.info != null) ? conn.info : "");
+                builder.append(",");
+                builder.append(conn.sent_bytes);
+                builder.append(",");
+                builder.append(conn.rcvd_bytes);
+                builder.append(",");
+                builder.append(conn.sent_pkts);
+                builder.append(",");
+                builder.append(conn.rcvd_pkts);
+                builder.append(",");
+                builder.append(conn.first_seen);
+                builder.append(",");
+                builder.append(conn.last_seen);
+                builder.append("\n");
             }
         }
 
         return builder.toString();
     }
+
 }
